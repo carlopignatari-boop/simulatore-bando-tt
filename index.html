@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulatore Bando TT — DGR 1221/2026</title>
+<style>
+  :root {
+    --bg: #f8f9fa; --card: #ffffff; --elevated: #f1f3f5;
+    --text: #1a1a2e; --text-strong: #0f0f1a; --muted: #6c757d;
+    --border: #dee2e6; --border-strong: #adb5bd;
+    --accent: #4f46e5; --accent-fill: #eef2ff; --accent-fg: #3730a3;
+    --ok: #059669; --warn: #d97706; --danger: #dc2626;
+    --ss: #3b82f6; --ss-bg: #dbeafe; --ss-text: #1e3a8a;
+    --tt: #10b981; --tt-bg: #d1fae5; --tt-text: #064e3b;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'SF Mono', 'Fira Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header { background: var(--card); border-bottom: 2px solid var(--border); padding: 16px 24px; }
+  header h1 { font-size: 17px; color: var(--text-strong); }
+  header p { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 24px; }
+
+  .scenario-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 7px 16px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--card); color: var(--text); cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: all .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tab-btn.active { background: var(--accent-fill); color: var(--accent-fg); border-color: var(--accent); }
+
+  .vincoli {
+    background: var(--card); border-radius: 8px; border: 1px solid var(--border);
+    padding: 10px 14px; margin-bottom: 14px; font-size: 11px; line-height: 2;
+  }
+  .v-red { color: var(--danger); font-weight: 700; }
+  .v-yellow { color: var(--warn); font-weight: 700; }
+
+  .main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 780px) { .main-grid { grid-template-columns: 1fr; } }
+
+  .input-panel { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 14px; }
+  .input-panel h3 { font-size: 12px; font-weight: 700; color: var(--text-strong); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
+
+  .voce-input { margin-bottom: 12px; }
+  .voce-input label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 600; color: var(--text-strong); margin-bottom: 4px; }
+  .voce-input label span { font-size: 10px; color: var(--muted); font-weight: 400; }
+  .input-row { display: flex; align-items: center; gap: 6px; }
+
+  /* Su iOS input[type=number] è problematico — usiamo text con inputmode=numeric */
+  .input-row input {
+    flex: 1; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 6px;
+    font-size: 15px; font-family: var(--mono); color: var(--text-strong); background: var(--bg);
+    -webkit-appearance: none; appearance: none;
+    transition: border-color .15s;
+  }
+  .input-row input:focus { outline: none; border-color: var(--accent); }
+  .input-row input.error { border-color: var(--danger); background: #fff5f5; }
+  .err-msg { font-size: 10px; color: var(--danger); margin-top: 2px; min-height: 14px; }
+
+  .slider-row {
+    background: var(--card); border-radius: 8px; border: 1px solid var(--border);
+    padding: 11px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .slider-row label { font-size: 12px; font-weight: 600; color: var(--text-strong); white-space: nowrap; }
+  input[type=range] {
+    flex: 1; min-width: 140px; max-width: 280px;
+    accent-color: var(--tt); height: 6px; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    background: linear-gradient(to right, var(--tt) 0%, var(--tt) 60%, var(--border) 60%);
+    border-radius: 3px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px;
+    border-radius: 50%; background: var(--tt); border: 2px solid white;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2); cursor: pointer;
+  }
+  .pct-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pct-pill { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  .pct-pill.ss { background: var(--ss-bg); color: var(--ss-text); }
+  .pct-pill.tt { background: var(--tt-bg); color: var(--tt-text); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .kpi { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 10px 12px; }
+  .kpi .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+  .kpi .value { font-size: 18px; font-weight: 700; color: var(--text-strong); }
+  .kpi .detail { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .kpi.green .value { color: var(--ok); }
+  .kpi.blue .value { color: var(--ss); }
+  .kpi.teal .value { color: var(--tt); }
+  .kpi.warn .value { color: var(--warn); }
+
+  .base-bar { margin: 8px 0 4px; }
+  .base-bar .bar-label { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .bar-track { height: 8px; background: var(--elevated); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .2s, background .2s; }
+
+  .legend { display: flex; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
+  .leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .table-wrap { background: var(--card); border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; min-width: 480px; }
+  th {
+    background: var(--elevated); color: var(--text-strong);
+    padding: 7px 9px; text-align: left; font-size: 11px;
+    border-bottom: 2px solid var(--border-strong); white-space: nowrap;
+  }
+  td { padding: 6px 9px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .voce-lbl { font-weight: 700; color: var(--text-strong); }
+
+  .pill { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 8px; font-weight: 700; white-space: nowrap; margin-left: 2px; }
+  .pill-ss  { background: var(--ss-bg); color: var(--ss-text); }
+  .pill-tt  { background: var(--tt-bg); color: var(--tt-text); }
+  .pill-cap { background: #fef3c7; color: #92400e; }
+  .pill-max { background: var(--accent-fill); color: var(--accent-fg); }
+  .pill-obl { background: #fee2e2; color: #991b1b; }
+  .pill-fac { background: #f3f4f6; color: #374151; }
+
+  .row-rat td  { background: #fffbeb; font-size: 11px; color: #92400e; }
+  .row-sub td  { background: var(--elevated); font-weight: 600; }
+  .row-f td, .row-g td { background: #f0eeff; font-weight: 700; }
+  .row-total td { background: var(--accent-fill); color: var(--accent-fg); font-weight: 700; font-size: 13px; }
+  .row-css td  { background: var(--ss-bg); color: var(--ss-text); font-weight: 700; }
+  .row-ctt td  { background: var(--tt-bg); color: var(--tt-text); font-weight: 700; }
+  .row-ctot td { background: #ecfdf5; color: #064e3b; font-weight: 700; font-size: 13px; }
+
+  .note { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 11px 14px; font-size: 11px; color: var(--muted); line-height: 1.8; margin-bottom: 14px; }
+  .note strong { color: var(--text-strong); }
+
+  details { margin-bottom: 14px; }
+  summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--accent); padding: 6px 0; }
+  .osc-wrap { background: var(--card); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 6px; }
+
+  .reset-btn {
+    width: 100%; margin-top: 10px; padding: 9px; border-radius: 6px;
+    border: 1.5px solid var(--border); background: var(--elevated);
+    color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧮 Simulatore Bando TT — DGR 1221/2026</h1>
+  <p>PR FESR 2021-2027 · Azione 1.1.1 · F e G sempre al massimo · Voci A-E personalizzabili</p>
+</header>
+
+<div class="container">
+
+  <div class="vincoli">
+    <span class="v-red">🔴 TT ≥ 50% costi totali</span> &nbsp;·&nbsp;
+    <span class="v-red">🔴 Voce A: almeno €40.000 a RAT/Università/Ente ricerca</span> &nbsp;·&nbsp;
+    <span class="v-red">🔴 Contributo max €300.000</span> (de minimis TT) &nbsp;·&nbsp;
+    <span class="v-yellow">🟡 Voce C ≤ €30.000 · F = 50% BASE (auto) · G = 7% (auto)</span>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="tab-btn active" id="tab200" onclick="setScenario(200000, this)">€200k</button>
+    <button class="tab-btn" id="tab400" onclick="setScenario(400000, this)">€400k</button>
+    <button class="tab-btn" id="tab600" onclick="setScenario(600000, this)">€600k ← max</button>
+    <button class="tab-btn" id="tab800" onclick="setScenario(800000, this)">€800k</button>
+    <button class="tab-btn" id="tabmax" onclick="setScenario('max', this)">Contrib. max €300k ★</button>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- Pannello input -->
+    <div>
+      <div class="input-panel">
+        <h3>Voci di spesa A–E</h3>
+
+        <div class="voce-input">
+          <label>A — Consulenze / know-how / ricerca <span>min €40k a soggetto ricerca</span></label>
+          <div class="input-row">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="inA" value="60000">
+            <span style="font-size:11px;color:var(--muted)">€</span>
+          </div>
+          <div class="err-msg" id="errA"></div>
+        </div>
+
+        <div class="voce-input">
+          <label>B — Nuovi ricercatori (OSC) <span>facoltativo · premialità +10%</span></label>
+          <div class="input-row">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="inB" value="0">
+            <span style="font-size:11px;color:var(--muted)">€</span>
+          </div>
+          <div class="err-msg" id="errB"></div>
+        </div>
+
+        <div class="voce-input">
+          <label>C — Software / hardware <span>max €30.000</span></label>
+          <div class="input-row">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="inC" value="20000">
+            <span style="font-size:11px;color:var(--muted)">€</span>
+          </div>
+          <div class="err-msg" id="errC"></div>
+        </div>
+
+        <div class="voce-input">
+          <label>D — Strumentazione / brevetti <span>costo unit. &gt;€100</span></label>
+          <div class="input-row">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="inD" value="30000">
+            <span style="font-size:11px;color:var(--muted)">€</span>
+          </div>
+          <div class="err-msg" id="errD"></div>
+        </div>
+
+        <div class="voce-input">
+          <label>E — Prototipi / dimostratori <span>100% TT per definizione</span></label>
+          <div class="input-row">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="inE" value="14000">
+            <span style="font-size:11px;color:var(--muted)">€</span>
+          </div>
+          <div class="err-msg" id="errE"></div>
+        </div>
+
+        <div class="base-bar">
+          <div class="bar-label">
+            <span>BASE usata</span>
+            <span id="baseUsedLbl">—</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" id="baseBarFill" style="width:0%;background:var(--ok)"></div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px" id="baseHint"></div>
+        </div>
+
+        <button class="reset-btn" onclick="resetDefaults()">↺ Ripristina valori predefiniti</button>
+      </div>
+
+      <div class="slider-row" style="margin-top:12px">
+        <label>% costi su TT:</label>
+        <input type="range" min="50" max="100" value="60" step="5" id="ttSlider">
+        <div class="pct-pills">
+          <span class="pct-pill tt" id="ttPill">TT 60%</span>
+          <span class="pct-pill ss" id="ssPill">SS 40%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Colonna destra -->
+    <div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <div class="legend">
+        <div class="leg"><div class="dot" style="background:var(--ss)"></div> SS (TRL 5-6) — contributo 25%</div>
+        <div class="leg"><div class="dot" style="background:var(--tt)"></div> TT (TRL 7-8) — contributo 50%</div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>V.</th>
+              <th>Descrizione</th>
+              <th class="num">Totale €</th>
+              <th class="num" style="color:var(--ss)">SS €</th>
+              <th class="num" style="color:var(--tt)">TT €</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="note" id="noteBox"></div>
+    </div>
+  </div>
+
+  <details>
+    <summary>📋 Tariffe OSC personale — D.I. MIMIT-MUR 4/1/2024 (max 1.720 ore/anno)</summary>
+    <div class="osc-wrap">
+      <table>
+        <thead><tr><th>Fascia</th><th>Profili</th><th class="num">€/ora</th><th class="num">Max ore/anno</th><th class="num">Costo max annuo</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Alto</strong></td><td>Dirigenti, R&D Manager</td><td class="num">83,00</td><td class="num">1.720</td><td class="num">142.760</td></tr>
+          <tr><td><strong>Medio</strong></td><td>Quadri, tecnici senior</td><td class="num">47,00</td><td class="num">1.720</td><td class="num">80.840</td></tr>
+          <tr><td><strong>Basso</strong></td><td>Impiegati, operai</td><td class="num">30,00</td><td class="num">1.720</td><td class="num">51.600</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+</div>
+
+<script>
+let currentTarget = 200000;
+let isMaxMode = false;
+
+function fmt(n) { return Math.round(n).toLocaleString('it-IT'); }
+
+function getVal(id) {
+  const raw = document.getElementById(id).value.replace(/\./g,'').replace(',','.');
+  const n = parseFloat(raw);
+  return isNaN(n) ? 0 : Math.max(0, n);
+}
+
+function getInputs() {
+  return { A: getVal('inA'), B: getVal('inB'), C: getVal('inC'), D: getVal('inD'), E: getVal('inE') };
+}
+
+const defaults = {
+  200000: { A: 60000,  B: 0, C: 20000, D: 30000,  E: 14000 },
+  400000: { A: 104000, B: 0, C: 30000, D: 46000,  E: 25000 },
+  600000: { A: 156000, B: 0, C: 30000, D: 80000,  E: 41000 },
+  800000: { A: 210000, B: 0, C: 30000, D: 110000, E: 53000 },
+  'max':  { A: 156000, B: 0, C: 30000, D: 80000,  E: 41000 },
+};
+
+function setDefaults(key) {
+  const d = defaults[key] || defaults[200000];
+  ['A','B','C','D','E'].forEach(id => {
+    document.getElementById('in'+id).value = d[id];
+  });
+}
+
+function resetDefaults() {
+  setDefaults(isMaxMode ? 'max' : currentTarget);
+  update();
+}
+
+function setScenario(totalOrMax, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  isMaxMode = totalOrMax === 'max';
+  if (!isMaxMode) currentTarget = totalOrMax;
+  setDefaults(isMaxMode ? 'max' : totalOrMax);
+  update();
+}
+
+function updateSliderTrack() {
+  const slider = document.getElementById('ttSlider');
+  const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+  slider.style.background = `linear-gradient(to right, var(--tt) 0%, var(--tt) ${pct}%, var(--border) ${pct}%)`;
+}
+
+function update() {
+  updateSliderTrack();
+  const v = getInputs();
+  const BASE = v.A + v.B + v.C + v.D + v.E;
+  const F = Math.round(BASE * 0.5);
+  const G = Math.round((BASE + F) * 0.07);
+  const TOTAL = BASE + F + G;
+
+  const ttPct = parseInt(document.getElementById('ttSlider').value) / 100;
+  const ssPct = 1 - ttPct;
+
+  document.getElementById('ttPill').textContent = 'TT ' + Math.round(ttPct*100) + '%';
+  document.getElementById('ssPill').textContent = 'SS ' + Math.round(ssPct*100) + '%';
+
+  // Validazione
+  const errs = { A:'', B:'', C:'', D:'', E:'' };
+  if (v.A < 40000) errs.A = '⚠ Minimo €40.000 (almeno €40k a RAT/Univ.)';
+  if (v.C > 30000) errs.C = '⚠ Massimo €30.000 (hard cap bando)';
+
+  ['A','B','C','D','E'].forEach(id => {
+    const el = document.getElementById('in'+id);
+    el.classList.toggle('error', errs[id] !== '');
+    document.getElementById('err'+id).textContent = errs[id];
+  });
+
+  // Barra BASE
+  const BASE_TARGET = isMaxMode ? null : Math.round(currentTarget / 1.605);
+  if (BASE_TARGET) {
+    const pct = Math.min((BASE / BASE_TARGET) * 100, 100);
+    const over = BASE > BASE_TARGET * 1.01;
+    const under = BASE < BASE_TARGET * 0.99;
+    document.getElementById('baseBarFill').style.width = pct + '%';
+    document.getElementById('baseBarFill').style.background = over ? 'var(--danger)' : under ? 'var(--warn)' : 'var(--ok)';
+    document.getElementById('baseUsedLbl').textContent = '€' + fmt(BASE) + ' / €' + fmt(BASE_TARGET);
+    document.getElementById('baseHint').textContent = over
+      ? '⚠ BASE supera target — totale: €' + fmt(TOTAL) + ' (> €' + fmt(currentTarget) + ')'
+      : under
+      ? 'Totale: €' + fmt(TOTAL) + ' — target €' + fmt(currentTarget) + ' (aggiungi voci)'
+      : 'Totale: €' + fmt(TOTAL) + ' ✓';
+  } else {
+    document.getElementById('baseBarFill').style.width = '80%';
+    document.getElementById('baseBarFill').style.background = 'var(--ok)';
+    document.getElementById('baseUsedLbl').textContent = '€' + fmt(BASE);
+    document.getElementById('baseHint').textContent = 'Modalità contrib. max — totale: €' + fmt(TOTAL);
+  }
+
+  // Ripartizione SS/TT
+  function sp(val, forceTT) {
+    if (forceTT) return { ss: 0, tt: val };
+    return { ss: Math.round(val * ssPct), tt: Math.round(val * ttPct) };
+  }
+  const vA = sp(v.A,false), vB = sp(v.B,false), vC = sp(v.C,false);
+  const vD = sp(v.D,false), vE = sp(v.E,true);
+  const vF = sp(F,false),   vG = sp(G,false);
+
+  const totalSS = Math.round(TOTAL * ssPct);
+  const totalTT = TOTAL - totalSS;
+  const contribSS = Math.round(totalSS * 0.25);
+  const contribTT = Math.min(Math.round(totalTT * 0.50), 300000);
+  const capHit = Math.round(totalTT * 0.50) > 300000;
+  const contribTot = contribSS + contribTT;
+  const eff = TOTAL > 0 ? ((contribTot / TOTAL) * 100).toFixed(1) : '0.0';
+
+  // KPI
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi"><div class="label">Costo totale</div><div class="value">€${fmt(TOTAL)}</div><div class="detail">${isMaxMode?'calcolato da voci':'taglio selezionato'}</div></div>
+    <div class="kpi"><div class="label">BASE (A→E)</div><div class="value">€${fmt(BASE)}</div><div class="detail">F = €${fmt(F)} · G = €${fmt(G)}</div></div>
+    <div class="kpi blue"><div class="label">Quota SS ${Math.round(ssPct*100)}%</div><div class="value">€${fmt(totalSS)}</div><div class="detail">→ contrib. €${fmt(contribSS)}</div></div>
+    <div class="kpi teal"><div class="label">Quota TT ${Math.round(ttPct*100)}%</div><div class="value">€${fmt(totalTT)}</div><div class="detail">→ contrib. €${fmt(contribTT)}${capHit?' ⚠cap':''}</div></div>
+    <div class="kpi green"><div class="label">Contributo totale</div><div class="value">€${fmt(contribTot)}</div><div class="detail">rimborso ${eff}%</div></div>
+    <div class="kpi ${capHit?'warn':''}"><div class="label">Autofinanziamento</div><div class="value">€${fmt(TOTAL-contribTot)}</div><div class="detail">${(100-parseFloat(eff)).toFixed(1)}% a carico impresa</div></div>
+  `;
+
+  // Tabella
+  const rows = [];
+  const addRow = (id, desc, val, ss, tt, badge) => rows.push(`<tr>
+    <td class="voce-lbl">${id}</td><td>${desc}</td>
+    <td class="num">${fmt(val)}</td>
+    <td class="num" style="color:var(--ss)">${fmt(ss)}</td>
+    <td class="num" style="color:var(--tt)">${fmt(tt)}</td>
+    <td>${badge}</td></tr>`);
+
+  addRow('A','Consulenze / know-how / ricerca <span class="pill pill-obl">≥€40k RAT/Univ.</span>',
+    v.A,vA.ss,vA.tt,'<span class="pill pill-ss">SS</span><span class="pill pill-tt">TT</span>');
+  rows.push(`<tr class="row-rat"><td></td><td colspan="5">↳ obbligatoriamente ≥ <strong>€40.000</strong> a RAT/Univ./Ente pubblico → imputare su TT</td></tr>`);
+  addRow('B','Nuovi ricercatori (OSC €30-83/ora) <span class="pill pill-fac">facoltativo</span>',
+    v.B,vB.ss,vB.tt,'<span class="pill pill-fac">premialità +10%</span>');
+  addRow('C','Software / hardware <span class="pill pill-cap">cap €30.000</span>',
+    v.C,vC.ss,vC.tt,'<span class="pill pill-ss">SS</span><span class="pill pill-tt">TT</span>');
+  addRow('D','Strumentazione / brevetti <small style="color:var(--muted)">unit.&gt;€100</small>',
+    v.D,vD.ss,vD.tt,'<span class="pill pill-ss">SS</span><span class="pill pill-tt">TT</span>');
+  addRow('E','Prototipi / dimostratori <span class="pill pill-tt">100% TT</span>',
+    v.E,0,v.E,'<span class="pill pill-tt">TRL 7-8</span>');
+
+  const baseSS = vA.ss+vB.ss+vC.ss+vD.ss;
+  const baseTT = vA.tt+vB.tt+vC.tt+vD.tt+v.E;
+  rows.push(`<tr class="row-sub">
+    <td colspan="2"><strong>BASE (A+B+C+D+E)</strong></td>
+    <td class="num"><strong>${fmt(BASE)}</strong></td>
+    <td class="num" style="color:var(--ss)"><strong>${fmt(baseSS)}</strong></td>
+    <td class="num" style="color:var(--tt)"><strong>${fmt(baseTT)}</strong></td>
+    <td></td></tr>`);
+  rows.push(`<tr class="row-f">
+    <td class="voce-lbl">F</td>
+    <td>Personale dipendente TD/TI <span class="pill pill-max">AUTO · 50% BASE</span></td>
+    <td class="num">${fmt(F)}</td>
+    <td class="num" style="color:var(--ss)">${fmt(vF.ss)}</td>
+    <td class="num" style="color:var(--tt)">${fmt(vF.tt)}</td>
+    <td><span class="pill pill-max">MAX</span></td></tr>`);
+  rows.push(`<tr class="row-g">
+    <td class="voce-lbl">G</td>
+    <td>Spese generali forfait <span class="pill pill-max">AUTO · 7% su A→F</span></td>
+    <td class="num">${fmt(G)}</td>
+    <td class="num" style="color:var(--ss)">${fmt(vG.ss)}</td>
+    <td class="num" style="color:var(--tt)">${fmt(vG.tt)}</td>
+    <td><span class="pill pill-max">MAX</span></td></tr>`);
+  rows.push(`<tr class="row-total">
+    <td colspan="2"><strong>TOTALE PROGETTO</strong></td>
+    <td class="num"><strong>€${fmt(TOTAL)}</strong></td>
+    <td class="num"><strong>€${fmt(totalSS)}</strong></td>
+    <td class="num"><strong>€${fmt(totalTT)}</strong></td>
+    <td></td></tr>`);
+  rows.push(`<tr class="row-css">
+    <td colspan="2">↳ Contributo SS (25% × €${fmt(totalSS)})</td>
+    <td class="num"></td><td class="num"><strong>€${fmt(contribSS)}</strong></td><td class="num"></td><td></td></tr>`);
+  rows.push(`<tr class="row-ctt">
+    <td colspan="2">↳ Contributo TT (50% × €${fmt(totalTT)})${capHit?' <span class="pill pill-cap">cap €300k</span>':''}</td>
+    <td class="num"></td><td class="num"></td><td class="num"><strong>€${fmt(contribTT)}</strong></td><td></td></tr>`);
+  rows.push(`<tr class="row-ctot">
+    <td colspan="2"><strong>CONTRIBUTO TOTALE · rimborso ${eff}%</strong></td>
+    <td class="num"><strong>€${fmt(contribTot)}</strong></td>
+    <td class="num" style="color:var(--ss-text)">€${fmt(contribSS)}</td>
+    <td class="num" style="color:var(--tt-text)">€${fmt(contribTT)}</td>
+    <td></td></tr>`);
+
+  document.getElementById('tbody').innerHTML = rows.join('');
+  document.getElementById('noteBox').innerHTML =
+    `<strong>F e G calcolati automaticamente:</strong> F = 50% × BASE · G = 7% × (BASE+F).<br>
+     <strong>Voce E</strong> sempre 100% TT (TRL 7-8 per definizione).<br>
+     <strong>Ripartizione SS/TT</strong> su A/B/C/D segue lo slider — da allineare alle attività reali in domanda.<br>
+     ${capHit?'<strong style="color:var(--warn)">⚠ Contributo TT cappato a €300.000 (de minimis). Verificare plafond residuo prima della domanda.</strong>':''}`;
+}
+
+// Collegamento eventi — robusto su iOS Safari (file locale)
+document.addEventListener('DOMContentLoaded', function() {
+  ['inA','inB','inC','inD','inE'].forEach(function(id) {
+    const el = document.getElementById(id);
+    el.addEventListener('input',  update);
+    el.addEventListener('change', update);
+    el.addEventListener('keyup',  update);
+    el.addEventListener('blur',   update);
+  });
+  const slider = document.getElementById('ttSlider');
+  slider.addEventListener('input',  update);
+  slider.addEventListener('change', update);
+  update();
+});
+</script>
+</body>
+</html>
